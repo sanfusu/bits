@@ -11,7 +11,7 @@ impl BitIndex for RangeInclusive<u32> {
     }
 
     fn len(&self) -> u32 {
-        self.end() - self.start()
+        self.end() - self.start() + 1
     }
 }
 impl BitIndex for u32 {

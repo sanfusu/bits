@@ -78,23 +78,23 @@ pub struct Bits<R: BitIndex, V: BitOps> {
 macro_rules! impl_bits {
     ($($Type:ty) *) => {
         $(impl<T:BitIndex> Bits<T, $Type> {
-            pub fn set(self) -> $Type {
+            pub fn set(&self) -> $Type {
                 let mask = mask!($Type, self.range);
                 self.value | mask
             }
-            pub fn clr(self) ->  $Type {
+            pub fn clr(&self) ->  $Type {
                 let mask = mask!($Type, self.range);
                 self.value & (!mask)
             }
-            pub fn revert(self) -> $Type {
+            pub fn revert(&self) -> $Type {
                 let mask = mask!($Type, self.range);
                 self.value ^ mask
             }
-            pub fn write(self, value: $Type) -> $Type {
+            pub fn write(&self, value: $Type) -> $Type {
                 let mask = mask!($Type, self.range);
                 self.value & (!mask) | (value & mask)
             }
-            pub fn read(self) -> $Type {
+            pub fn read(&self) -> $Type {
                 let mask = mask!($Type, self.range);
                 (self.value & mask) >> self.range.offset()
             }

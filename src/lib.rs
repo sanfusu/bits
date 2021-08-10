@@ -68,7 +68,7 @@ impl_bitops!(u8 u16 u32 u64 u128);
 /// 单独构造该结构体主要是为了将 bit range 和要写入的值分开，这两者的类型可能会一样，在无 IDE 类型提示的情况下导致调用顺序颠倒：
 /// `0u8.bits_write(5, 1);` 无法区分哪一个是 range，哪一个是要写入的值。
 /// 当然也可以通过 `0u8.bits_set(5); ` 来避免，但 bits_write 依旧暴露存在风险。
-/// 
+///
 /// 综上选择单独构造 Bits 结构体。
 pub struct Bits<R: BitIndex, V: BitOps> {
     range: R,
@@ -78,21 +78,25 @@ pub struct Bits<R: BitIndex, V: BitOps> {
 macro_rules! impl_bits {
     ($($Type:ty) *) => {
         $(impl<T:BitIndex> Bits<T, $Type> {
+            #[must_use="set function dosen't modify the self in place, you should assign to it explicitly"]
             pub fn set(&self) -> $Type {
                 let mask = mask!($Type, self.range);
                 self.value | mask
             }
+            #[must_use="clr function dosen't modify the self in place, you should assign to it explicitly"]
             pub fn clr(&self) ->  $Type {
                 let mask = mask!($Type, self.range);
                 self.value & (!mask)
             }
+            #[must_use="revert function dosen't modify the self in place, you should assign to it explicitly"]
             pub fn revert(&self) -> $Type {
                 let mask = mask!($Type, self.range);
                 self.value ^ mask
             }
+            #[must_use="write function dosen't modify the self in place, you should assign to it explicitly"]
             pub fn write(&self, value: $Type) -> $Type {
                 let mask = mask!($Type, self.range);
-                self.value & (!mask) | (value & mask)
+                (self.value & (!mask)) | ((value << self.range.offset()) & mask)
             }
             pub fn read(&self) -> $Type {
                 let mask = mask!($Type, self.range);

@@ -7,19 +7,21 @@ pub trait BitIndex {
 }
 
 impl BitIndex for RangeInclusive<u32> {
+    #[inline]
     fn offset(&self) -> u32 {
         *self.start()
     }
-
+    #[inline]
     fn len(&self) -> u32 {
         self.end() - self.start() + 1
     }
 }
 impl BitIndex for u32 {
+    #[inline]
     fn offset(&self) -> u32 {
         *self
     }
-
+    #[inline]
     fn len(&self) -> u32 {
         1
     }

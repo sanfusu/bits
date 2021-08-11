@@ -1,4 +1,5 @@
-use std::ops::RangeInclusive;
+#![no_std]
+use core::ops::RangeInclusive;
 
 /// 提供类似于 SliceIndex 的使用方式。
 pub trait BitIndex {

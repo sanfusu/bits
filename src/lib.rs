@@ -29,13 +29,12 @@ impl BitIndex for u32 {
 }
 
 /// 对外接口，实际操作由 Bits 结构体完成。
-pub trait BitOps
+pub trait IntoBits<T: BitIndex>
 where
-    Self: Sized,
+    Self: Sized + Copy,
 {
-    fn bits<T: BitIndex>(self, range: T) -> Bits<T, Self> {
-        Bits { value: self, range }
-    }
+    type Output: BitsIo<Self>;
+    fn bits(self, range: T) -> Self::Output;
 }
 macro_rules! mask {
     ($Type:ty, $Range:expr) => {
@@ -45,13 +44,21 @@ macro_rules! mask {
         } << $Range.offset()
     };
 }
-macro_rules! impl_bitops {
+macro_rules! impl_intobits {
     ($($Type:ty) *) => {
-        $(impl BitOps for $Type {})*
+        $(impl<T:BitIndex> IntoBits<T> for $Type {
+            type Output = Bits<T, Self>;
+            fn bits(self, range:T) -> Self::Output{
+                Bits {
+                    value:self,
+                    range
+                }
+            }
+        })*
     };
 }
 
-impl_bitops!(u8 u16 u32 u64 u128);
+impl_intobits!(u8 u16 u32 u64 u128);
 
 /// 该结构体可以通过 `0x10u32.bits(0x01)` 来构造
 /// ```
@@ -73,35 +80,42 @@ impl_bitops!(u8 u16 u32 u64 u128);
 /// 当然也可以通过 `0u8.bits_set(5); ` 来避免，但 bits_write 依旧暴露存在风险。
 ///
 /// 综上选择单独构造 Bits 结构体。
-pub struct Bits<R: BitIndex, V: BitOps> {
+pub struct Bits<R: BitIndex, V: IntoBits<R>> {
     range: R,
     value: V,
+}
+pub trait BitsIo<T> {
+    fn set(&self) -> T;
+    fn clr(&self) -> T;
+    fn revert(&self) -> T;
+    fn write(&self, value: T) -> T;
+    fn read(&self) -> T;
 }
 
 macro_rules! impl_bits {
     ($($Type:ty) *) => {
-        $(impl<T:BitIndex> Bits<T, $Type> {
+        $(impl<T:BitIndex> BitsIo<$Type> for  Bits<T, $Type> {
             #[must_use="set function dosen't modify the self in place, you should assign to it explicitly"]
-            pub fn set(&self) -> $Type {
+            fn set(&self) -> $Type {
                 let mask = mask!($Type, self.range);
                 self.value | mask
             }
             #[must_use="clr function dosen't modify the self in place, you should assign to it explicitly"]
-            pub fn clr(&self) ->  $Type {
+            fn clr(&self) ->  $Type {
                 let mask = mask!($Type, self.range);
                 self.value & (!mask)
             }
             #[must_use="revert function dosen't modify the self in place, you should assign to it explicitly"]
-            pub fn revert(&self) -> $Type {
+            fn revert(&self) -> $Type {
                 let mask = mask!($Type, self.range);
                 self.value ^ mask
             }
             #[must_use="write function dosen't modify the self in place, you should assign to it explicitly"]
-            pub fn write(&self, value: $Type) -> $Type {
+            fn write(&self, value: $Type) -> $Type {
                 let mask = mask!($Type, self.range);
                 (self.value & (!mask)) | ((value << self.range.offset()) & mask)
             }
-            pub fn read(&self) -> $Type {
+            fn read(&self) -> $Type {
                 let mask = mask!($Type, self.range);
                 (self.value & mask) >> self.range.offset()
             }

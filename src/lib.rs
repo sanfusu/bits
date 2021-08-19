@@ -33,7 +33,7 @@ pub trait IntoBits<T: BitIndex>
 where
     Self: Sized + Copy,
 {
-    type Output: BitsIo<Self>;
+    type Output: BitsOps<Self>;
     fn bits(self, range: T) -> Self::Output;
 }
 macro_rules! mask {
@@ -84,17 +84,19 @@ pub struct Bits<R: BitIndex, V: IntoBits<R>> {
     range: R,
     value: V,
 }
-pub trait BitsIo<T> {
+pub trait BitsOps<T> {
     fn set(&self) -> T;
     fn clr(&self) -> T;
     fn revert(&self) -> T;
     fn write(&self, value: T) -> T;
     fn read(&self) -> T;
+    fn is_clr(&self) -> bool;
+    fn is_set(&self) -> bool;
 }
 
 macro_rules! impl_bits {
     ($($Type:ty) *) => {
-        $(impl<T:BitIndex> BitsIo<$Type> for  Bits<T, $Type> {
+        $(impl<T:BitIndex> BitsOps<$Type> for  Bits<T, $Type> {
             #[must_use="set function dosen't modify the self in place, you should assign to it explicitly"]
             fn set(&self) -> $Type {
                 let mask = mask!($Type, self.range);
@@ -118,6 +120,12 @@ macro_rules! impl_bits {
             fn read(&self) -> $Type {
                 let mask = mask!($Type, self.range);
                 (self.value & mask) >> self.range.offset()
+            }
+            fn is_clr(&self)-> bool {
+                self.read() == 0
+            }
+            fn is_set(&self)->bool {
+                self.read() == mask!($Type, self.range)
             }
         })*
     };

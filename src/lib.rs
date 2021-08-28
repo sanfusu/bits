@@ -65,16 +65,17 @@ impl_intobits!(u8 u16 u32 u64 u128);
 /// 该结构体可以通过 `0x10u32.bits(0x01)` 来构造
 /// ```
 /// extern crate bits;
-/// use bits::BitOps;
+/// use bits::BitsOps;
+/// use bits::IntoBits;
 /// assert_eq!(0u8.bits(0).set(), 0x01);
 /// assert_eq!(0u8.bits(1).set(), 0x02);
 /// assert_eq!(0u8.bits(4..=7).set(), 0xf0);
 /// assert_eq!(0xffu8.bits(4..=7).clr(), 0x0f);
 /// assert_eq!(0xffu8.bits(3).revert(), 0xf7);
 /// assert_eq!(0xffu8.bits(4..=7).revert(), 0x0f);
-/// assert_eq!(0u8.bits(4..=7).write(0x10), 0x10);
+/// assert_eq!(0u8.bits(4..=7).write(0x10), 0x0);
 /// // 只会写入 value 的相应的 bit 位。低 4 bit 并不会被修改。
-/// assert_eq!(0u8.bits(4..=7).write(0x12), 0x10);
+/// assert_eq!(0u8.bits(4..=7).write(0x12), 0x20);
 /// assert_eq!(0x12u8.bits(4..=7).read(), 0x1);
 /// ```
 /// 单独构造该结构体主要是为了将 bit range 和要写入的值分开，这两者的类型可能会一样，在无 IDE 类型提示的情况下导致调用顺序颠倒：

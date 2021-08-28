@@ -1,15 +1,20 @@
-/// ```
-/// BufferType[data] {
-///     field1 [position, r/w, type] {
-///         input_converter: |x| {};
-///         output_converter: |x| {}
+/// ```not_run
+/// BufferType [raw_data] {
+///     field1 [position, rw, type1] {
+///         input_converter: |x: type1| {
+///             x.convert_into()
+///         };
+///         output_converter: |x| {
+///             x.convert_into()
+///         }
 ///     },
-///     field2 [position, r/w, type] {
-///         input_converter: |x| {};
-///         output_converter: |x| {},
+///     field2 [position, ro, type2] {
+///         output_converter: |x: type2| {
+///             x.convert_into()
+///         }
 ///     },
-///     field3 (position, r/w, type),
-///     field4 (position, r/w, type)
+///     field3 (position, ro, type3),
+///     field4 (position, rw, type4)
 /// }
 /// ```
 #[macro_export]

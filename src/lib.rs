@@ -1,4 +1,6 @@
 #![no_std]
+pub mod field;
+
 use core::ops::RangeInclusive;
 
 /// 提供类似于 SliceIndex 的使用方式。
@@ -94,9 +96,9 @@ pub trait BitsOps<T> {
     fn is_set(&self) -> bool;
 }
 
-macro_rules! impl_bits {
+macro_rules! impl_bitsops {
     ($($Type:ty) *) => {
-        $(impl<T:BitIndex> BitsOps<$Type> for  Bits<T, $Type> {
+        $(impl<R:BitIndex> BitsOps<$Type> for  Bits<R, $Type> {
             #[must_use="set function dosen't modify the self in place, you should assign to it explicitly"]
             fn set(&self) -> $Type {
                 let mask = mask!($Type, self.range);
@@ -130,4 +132,14 @@ macro_rules! impl_bits {
         })*
     };
 }
-impl_bits!(u8 u16 u32 u64 u128);
+impl_bitsops!(u8 u16 u32 u64 u128);
+
+#[cfg(test)]
+mod test {
+    use crate::{BitsOps, IntoBits};
+
+    #[test]
+    fn fool() {
+        1u8.bits(0).is_clr();
+    }
+}

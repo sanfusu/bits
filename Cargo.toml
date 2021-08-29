@@ -2,7 +2,10 @@
 name = "bits"
 version = "0.1.0"
 edition = "2018"
-
+license-file = "LICENSE"
+description = "Bits ops and bit field trait and macro helper"
+keywords = ["bits", "bit", "bitfield", "bitops"]
+repository = ""
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]

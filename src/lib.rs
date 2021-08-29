@@ -76,6 +76,10 @@ impl_intobits!(u8 u16 u32 u64 u128);
 /// // 只会写入 value 的相应的 bit 位。低 4 bit 并不会被修改。
 /// assert_eq!(0u8.bits(4..=7).write(0x12), 0x20);
 /// assert_eq!(0x12u8.bits(4..=7).read(), 0x1);
+/// assert_eq!(0xf0u8.bits(4..=7).is_set(), true);
+/// assert_eq!(0x70u8.bits(4..=7).is_set(), false);
+/// assert_eq!(0x70u8.bits(4..=7).is_clr(), false);
+/// assert_eq!(0x70u8.bits(0..=3).is_clr(), true);
 /// ```
 /// 单独构造该结构体主要是为了将 bit range 和要写入的值分开，这两者的类型可能会一样，在无 IDE 类型提示的情况下导致调用顺序颠倒：
 /// `0u8.bits_write(5, 1)` 无法区分哪一个是 range，哪一个是要写入的值。
@@ -130,7 +134,7 @@ macro_rules! impl_bitsops {
                 self.read() == 0
             }
             fn is_set(&self)->bool {
-                self.read() == mask!($Type, self.range)
+                self.read() == mask!($Type, self.range) >> self.range.offset()
             }
         })*
     };

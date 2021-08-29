@@ -6,7 +6,6 @@ license-file = "LICENSE"
 description = "Bits ops and bit field trait and macro helper"
 keywords = ["bits", "bit", "bitfield", "bitops"]
 repository = "https://gitee.com/sanfusu/bits"
-documentation = "https://docs.rs/bits"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]

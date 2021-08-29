@@ -30,7 +30,7 @@ impl BitIndex for u32 {
     }
 }
 
-/// 对外接口，实际操作由 Bits 结构体完成。
+/// 将整型转为 Bits，实际操作由 BitsOps 来实现。
 pub trait IntoBits<T: BitIndex>
 where
     Self: Sized + Copy,
@@ -64,7 +64,6 @@ impl_intobits!(u8 u16 u32 u64 u128);
 
 /// 该结构体可以通过 `0x10u32.bits(0x01)` 来构造
 /// ```
-/// extern crate bits;
 /// use bits::BitsOps;
 /// use bits::IntoBits;
 /// assert_eq!(0u8.bits(0).set(), 0x01);
@@ -79,14 +78,17 @@ impl_intobits!(u8 u16 u32 u64 u128);
 /// assert_eq!(0x12u8.bits(4..=7).read(), 0x1);
 /// ```
 /// 单独构造该结构体主要是为了将 bit range 和要写入的值分开，这两者的类型可能会一样，在无 IDE 类型提示的情况下导致调用顺序颠倒：
-/// `0u8.bits_write(5, 1);` 无法区分哪一个是 range，哪一个是要写入的值。
-/// 当然也可以通过 `0u8.bits_set(5); ` 来避免，但 bits_write 依旧暴露存在风险。
+/// `0u8.bits_write(5, 1)` 无法区分哪一个是 range，哪一个是要写入的值。
+///
+/// 当然也可以通过 `0u8.bits_set(5); ` 来避免，但 bits_write 的存在依旧会暴露风险。
 ///
 /// 综上选择单独构造 Bits 结构体。
 pub struct Bits<R: BitIndex, V: IntoBits<R>> {
     range: R,
     value: V,
 }
+
+/// bits 的实际操作
 pub trait BitsOps<T> {
     fn set(&self) -> T;
     fn clr(&self) -> T;
@@ -134,13 +136,3 @@ macro_rules! impl_bitsops {
     };
 }
 impl_bitsops!(u8 u16 u32 u64 u128);
-
-#[cfg(test)]
-mod test {
-    use crate::{BitsOps, IntoBits};
-
-    #[test]
-    fn fool() {
-        1u8.bits(0).is_clr();
-    }
-}

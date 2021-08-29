@@ -1,21 +1,72 @@
-/// ```not_run
-/// BufferType [raw_data] {
-///     field1 [position, rw, type1] {
-///         input_converter: |x: type1| {
-///             x.convert_into()
-///         };
-///         output_converter: |x| {
-///             x.convert_into()
-///         }
-///     },
-///     field2 [position, ro, type2] {
-///         output_converter: |x: type2| {
-///             x.convert_into()
-///         }
-///     },
-///     field3 (position, ro, type3),
-///     field4 (position, rw, type4)
+/// 用于为含有 bit field 的结构体中的 bit 字段实现
+/// [`Field`]、[`FieldReader`]、[`FieldWriter`] 接口。
+/// 具体用法看示例：
+///  ```
+/// use bits::field::BufferWriter;
+/// use bits::field::BufferReader;
+/// use bits::IntoBits;
+/// use bits::BitsOps;
+///
+/// pub struct FoolData {
+///     data: u32,
+///     data1: u32,
 /// }
+/// impl BufferWriter for FoolData{}
+/// impl BufferReader for FoolData{}
+///
+/// // bit 字段 1，其余类推
+/// pub struct Flag1;
+/// pub struct Flag2;
+/// pub struct Flag3;
+/// pub struct Flag4;
+/// pub struct Flag5;
+/// pub struct Flag6;
+///
+/// bits::fields! {
+///     FoolData [data] {
+///         Flag1 [0..=3, rw, u32],
+///         Flag2 [4..=5, rw, u32],
+///         Flag3 [6, ro, bool],
+///         Flag4 [7, rw, bool],
+///         Flag5 [8..=9, rw, bool] {
+///             input_converter: |x| match x {
+///                 true => 0x1,
+///                 _ => 0x0
+///             };
+///             output_converter: |x| match x {
+///                 0x1 => true,
+///                 _ => false
+///             }
+///         }
+///     }
+///     FoolData [data1] {
+///         Flag6 [0..=3, rw, u32]
+///     }
+/// }
+/// let mut fool = FoolData {data:0x0, data1: 0x0};
+/// fool.write::<Flag1>(0xf);
+/// assert_eq!(fool.data, 0xf);
+///
+/// fool.write::<Flag2>(0x3);
+/// assert_eq!(fool.data, 0b0011_1111);
+///
+/// // error: the trait `FieldWriter<FoolData>` is not implemented for `Flag3`
+/// // fool.write::<Flag3>(true); // Flag3 is not writeable
+///
+/// fool.write::<Flag4>(true);
+/// assert_eq!(fool.data, 0b1011_1111);
+///
+/// let flag3 = fool.read::<Flag3>();
+/// assert_eq!(flag3, false);
+///
+/// let flag4 = fool.read::<Flag4>();
+/// assert_eq!(flag4, true);
+///
+/// fool.data = fool.data.bits(8..=9).write(0x2); // set fool.data bits 8..=9 to 0x2
+/// assert_eq!(false, fool.read::<Flag5>()); // bits: 8..=9 equal to 0x2 which is false
+///
+/// fool.write::<Flag5>(true);
+/// assert_eq!(0b01, fool.data.bits(8..=9).read());
 /// ```
 #[macro_export]
 macro_rules! fields {
@@ -90,9 +141,13 @@ macro_rules! fields {
     };
 }
 
-/// Impl for RegBuffer::Regbuff if you want to config field.
+/// # Buffer 写入器
+///
+/// 通常将 bit 字段归属的结构体看作缓存。通过实现 BufferWriter 来对 bit 字段进行写入操作。
+/// bit 字段所归属的结构体需要实现该接口（如果含有任何可写 bit 字段）。
+///
+/// 👍 将 bit 字段归属的结构体看作缓存，在实现寄存器读写操作时会非常有益。
 pub trait BufferWriter {
-    #[must_use = "The modified value works after flushed into register"]
     fn write<T>(&mut self, value: T::ValueType) -> &mut Self
     where
         T: Field<Self> + FieldWriter<Self>,
@@ -101,7 +156,12 @@ pub trait BufferWriter {
         self
     }
 }
-/// impl for RegBuffer::Regbuff if you want to get field;
+/// # Buffer 读出器
+///
+/// 通常将 bit 字段归属的结构体看作缓存。通过实现 BufferReader 来对 bit 字段进行读出操作。
+/// bit 字段所归属的结构体需要实现该接口（如果含有任何可读 bit 字段）。
+///
+/// 👍 将 bit 字段归属的结构体看作缓存，在实现寄存器读写操作时会非常有益。
 pub trait BufferReader {
     fn read<T: Field<Self> + FieldReader<Self>>(&self) -> T::ValueType {
         T::read(self)
@@ -112,8 +172,10 @@ pub trait BufferReader {
     }
 }
 
-/// impl for Reg's fields;
-/// RegFieldWrite and RegFieldRead use the same ValueType and Regbuff to keep consistent.
+/// # 标识一个 bit 字段
+///
+/// 类型参数 BufferType 一般为 bit 字段所归属的结构体类型，这样可以保持一致性。
+/// 也可以是其他结构体类型，这样多个结构体类型将拥有同一个字段，但彼此的位置和值类型可以互不相同。
 pub trait Field<BufferType>
 where
     BufferType: ?Sized,
@@ -121,14 +183,18 @@ where
     type ValueType;
 }
 
-/// impl for RegField's instance
+/// # bit 字段写入器
+///
+/// bit 字段的实际写入函数，类型参数 BufferType 一般为 bit 字段归属的结构体类型。
 pub trait FieldWriter<BufferType>: Field<BufferType>
 where
     BufferType: ?Sized,
 {
     fn write(buffer: &mut BufferType, value: Self::ValueType);
 }
-/// impl for RegField's instance
+/// # bit 字段读出器
+///
+/// bit 字段的实际读出函数，类型参数 BufferType 一般为 bit 字段归属的结构体类型。
 pub trait FieldReader<BufferType>: Field<BufferType>
 where
     BufferType: ?Sized,

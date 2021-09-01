@@ -68,6 +68,10 @@
 /// fool.write::<Flag5>(true);
 /// assert_eq!(0b01, fool.data.bits(8..=9).read());
 /// ```
+///
+/// 值得注意的是将字段结构体定义留给程序员自行定义，
+/// 这样可以避免在同一个命名空间内，通过宏为不同的结构体定义相同的字段时，
+/// 造成重定义。
 #[macro_export]
 macro_rules! fields {
     (

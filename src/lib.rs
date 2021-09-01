@@ -1,7 +1,7 @@
 #![no_std]
 pub mod field;
 
-use core::ops::RangeInclusive;
+use core::ops::{Range, RangeInclusive};
 
 /// 提供类似于 SliceIndex 的使用方式。
 pub trait BitIndex {
@@ -17,6 +17,18 @@ impl BitIndex for RangeInclusive<u32> {
     #[inline]
     fn len(&self) -> u32 {
         self.end() - self.start() + 1
+    }
+}
+
+impl BitIndex for Range<u32> {
+    #[inline]
+    fn offset(&self) -> u32 {
+        self.start
+    }
+
+    #[inline]
+    fn len(&self) -> u32 {
+        self.end - self.start
     }
 }
 impl BitIndex for u32 {
@@ -92,6 +104,54 @@ pub struct Bits<R: BitIndex, V: IntoBits<R>> {
     value: V,
 }
 
+impl<R: BitIndex, V: IntoBits<R> + IntoBits<u32>> IntoIterator for Bits<R, V> {
+    type Item = Bit;
+
+    type IntoIter = BitsIter<V>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        Self::IntoIter {
+            low: self.range.offset(),
+            upper: self.range.offset() + self.range.len() - 1,
+            value: self.value,
+        }
+    }
+}
+
+pub struct Bit {
+    value: bool,
+}
+impl Bit {
+    #[inline]
+    pub fn is_set(&self) -> bool {
+        self.value
+    }
+    #[inline]
+    pub fn is_clr(&self) -> bool {
+        !self.value
+    }
+}
+pub struct BitsIter<V: IntoBits<u32>> {
+    value: V,
+    upper: u32,
+    low: u32,
+}
+
+impl<V: IntoBits<u32>> Iterator for BitsIter<V> {
+    type Item = Bit;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let ret = if self.low <= self.upper {
+            Some(Bit {
+                value: self.value.bits(self.low).is_set(),
+            })
+        } else {
+            None
+        };
+        self.low += 1;
+        ret
+    }
+}
 /// bits 的实际操作
 pub trait BitsOps<T> {
     fn set(&self) -> T;

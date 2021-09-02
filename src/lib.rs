@@ -138,7 +138,7 @@ impl<V: IntoBits<u32>> Bit<V> {
 
 /// # Bits 迭代器
 ///
-/// ~⚠️ 性能较差，比手动掩码移位循环慢三分之一左右。~
+/// ~~⚠️ 性能较差，比手动掩码移位循环慢三分之一左右。~~
 /// 目前使用迭代器的速度要比手动编码快 99%，很戏剧化。
 pub struct BitsIter<V: IntoBits<u32>> {
     value: V,
@@ -259,5 +259,39 @@ mod tests {
         let n = test::black_box(0xffff);
         let mut out = test::black_box([0u8; 64]);
         b.iter(|| (0..=n).for_each(|x| iterator_code(x, &mut out)))
+    }
+    #[no_mangle]
+    fn count_ones_iterator(data: u64) -> u32 {
+        let mut ret = 0;
+        for bit in data.bits(0..=63) {
+            if bit.is_set() {
+                ret += 1;
+            }
+        }
+        ret
+    }
+    #[no_mangle]
+    fn count_ones_interal(data: u64) -> u32 {
+        data.count_ones()
+    }
+    #[bench]
+    fn bench_count_ones_iterator(b: &mut Bencher) {
+        let n = test::black_box(0xffff);
+        let mut result = test::black_box(0);
+        b.iter(|| {
+            (0..=n).for_each(|x| {
+                result += count_ones_iterator(x);
+            })
+        });
+    }
+    #[bench]
+    fn bench_count_ones_interal(b: &mut Bencher) {
+        let n = test::black_box(0xffff);
+        let mut result = test::black_box(0);
+        b.iter(|| {
+            (0..=n).for_each(|x: u64| {
+                result += count_ones_interal(x);
+            })
+        })
     }
 }

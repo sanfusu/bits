@@ -1,4 +1,8 @@
 #![no_std]
+#![feature(test)]
+
+extern crate test;
+
 pub mod field;
 
 use core::ops::{Range, RangeInclusive};
@@ -206,3 +210,43 @@ macro_rules! impl_bitsops {
     };
 }
 impl_bitsops!(u8 u16 u32 u64 u128);
+
+#[cfg(test)]
+mod tests {
+    use test::Bencher;
+
+    use crate::IntoBits;
+
+    fn iterator_code(data: u64, out: &mut [u8; 64]) {
+        for (idx, bit) in data.bits(0..=63).into_iter().enumerate() {
+            out[idx] = bit.is_set() as u8;
+        }
+    }
+    fn loop_code(data: u64, out: &mut [u8; 64]) {
+        let mut mask = 0x1u64;
+        let mut idx = 0usize;
+        while idx < 64 {
+            if data & mask != 0 {
+                out[idx] = 1;
+            } else {
+                out[idx] = 0;
+            }
+            mask <<= 1;
+            idx += 1;
+        }
+    }
+
+    #[bench]
+    fn bench_loop_code(b: &mut Bencher) {
+        let n = test::black_box(1000);
+        let mut out = test::black_box([0u8; 64]);
+        b.iter(|| (0..=n).for_each(|x| loop_code(x, &mut out)))
+    }
+
+    #[bench]
+    fn bench_iterator_code(b: &mut Bencher) {
+        let n = test::black_box(1000);
+        let mut out = test::black_box([0u8; 64]);
+        b.iter(|| (0..=n).for_each(|x| iterator_code(x, &mut out)))
+    }
+}

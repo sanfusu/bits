@@ -83,4 +83,9 @@ assert_eq!(false, fool.read::<Flag5>()); // bits: 8..=9 equal to 0x2 which is fa
 
 fool.write::<Flag5>(true);
 assert_eq!(0b01, fool.data.bits(8..=9).read());
+
+// bit 位迭代器
+for bit in 0x55u8.bits() {
+    print!("{}", bit.is_set());
+}
 ```

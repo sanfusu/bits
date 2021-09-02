@@ -181,7 +181,7 @@ macro_rules! impl_bitsops {
                 self.value | mask
             }
             #[must_use="clr function dosen't modify the self in place, you should assign to it explicitly"]
-            fn clr(&self) ->  $Type {
+            fn clr(&self) -> $Type {
                 let mask = mask!($Type, self.range);
                 self.value & (!mask)
             }
@@ -199,10 +199,10 @@ macro_rules! impl_bitsops {
                 let mask = mask!($Type, self.range);
                 (self.value & mask) >> self.range.offset()
             }
-            fn is_clr(&self)-> bool {
+            fn is_clr(&self) -> bool {
                 self.read() == 0
             }
-            fn is_set(&self)->bool {
+            fn is_set(&self) -> bool {
                 let mask = mask!($Type, self.range);
                 (self.value & mask) == mask
             }
@@ -236,16 +236,27 @@ mod tests {
         }
     }
 
+    #[test]
+    fn iterator_test() {
+        let mut out_iterator = [0u8; 64];
+        let mut out_loop = [0u8; 64];
+        (0..=0xffff).for_each(|x| {
+            iterator_code(x, &mut out_iterator);
+            loop_code(x, &mut out_loop);
+            assert_eq!(out_iterator, out_loop);
+        })
+    }
+
     #[bench]
     fn bench_loop_code(b: &mut Bencher) {
-        let n = test::black_box(1000);
+        let n = test::black_box(0xffff);
         let mut out = test::black_box([0u8; 64]);
         b.iter(|| (0..=n).for_each(|x| loop_code(x, &mut out)))
     }
 
     #[bench]
     fn bench_iterator_code(b: &mut Bencher) {
-        let n = test::black_box(1000);
+        let n = test::black_box(0xffff);
         let mut out = test::black_box([0u8; 64]);
         b.iter(|| (0..=n).for_each(|x| iterator_code(x, &mut out)))
     }

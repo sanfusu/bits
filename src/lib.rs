@@ -105,7 +105,7 @@ pub struct Bits<R: BitIndex, V: IntoBits<R>> {
 }
 
 impl<R: BitIndex, V: IntoBits<R> + IntoBits<u32>> IntoIterator for Bits<R, V> {
-    type Item = Bit;
+    type Item = Bit<V>;
 
     type IntoIter = BitsIter<V>;
 
@@ -118,19 +118,24 @@ impl<R: BitIndex, V: IntoBits<R> + IntoBits<u32>> IntoIterator for Bits<R, V> {
     }
 }
 
-pub struct Bit {
-    value: bool,
+pub struct Bit<V: IntoBits<u32>> {
+    value: V,
 }
-impl Bit {
+impl<V: IntoBits<u32>> Bit<V> {
     #[inline]
     pub fn is_set(&self) -> bool {
-        self.value
+        self.value.bits(0).is_set()
     }
     #[inline]
     pub fn is_clr(&self) -> bool {
-        !self.value
+        !self.is_set()
     }
 }
+
+/// # Bits 迭代器
+///
+/// ~⚠️ 性能较差，比手动掩码移位循环慢三分之一左右。~
+/// 目前使用迭代器的速度要比手动编码快 99%，很戏剧化。
 pub struct BitsIter<V: IntoBits<u32>> {
     value: V,
     upper: u32,
@@ -138,12 +143,12 @@ pub struct BitsIter<V: IntoBits<u32>> {
 }
 
 impl<V: IntoBits<u32>> Iterator for BitsIter<V> {
-    type Item = Bit;
+    type Item = Bit<V>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let ret = if self.low <= self.upper {
             Some(Bit {
-                value: self.value.bits(self.low).is_set(),
+                value: self.value.bits(self.low).read(),
             })
         } else {
             None
@@ -194,7 +199,8 @@ macro_rules! impl_bitsops {
                 self.read() == 0
             }
             fn is_set(&self)->bool {
-                self.read() == mask!($Type, self.range) >> self.range.offset()
+                let mask = mask!($Type, self.range);
+                (self.value & mask) == mask
             }
         })*
     };

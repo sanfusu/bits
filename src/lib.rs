@@ -5,68 +5,82 @@ extern crate test;
 
 pub mod field;
 
-use core::ops::{Range, RangeInclusive};
+use core::ops::{Bound, Range, RangeBounds, RangeFull, RangeInclusive};
 
 /// 提供类似于 SliceIndex 的使用方式。
 pub trait BitIndex {
-    fn offset(&self) -> u32;
-    fn len(&self) -> u32;
+    fn low(&self) -> Bound<&u32>;
+    fn upper(&self) -> Bound<&u32>;
 }
 
 impl BitIndex for RangeInclusive<u32> {
-    #[inline]
-    fn offset(&self) -> u32 {
-        *self.start()
+    fn upper(&self) -> Bound<&u32> {
+        self.end_bound()
     }
-    #[inline]
-    fn len(&self) -> u32 {
-        self.end() - self.start() + 1
+
+    fn low(&self) -> Bound<&u32> {
+        self.start_bound()
     }
 }
-
-impl BitIndex for Range<u32> {
-    #[inline]
-    fn offset(&self) -> u32 {
-        self.start
+impl BitIndex for RangeFull {
+    fn low(&self) -> Bound<&u32> {
+        Bound::Included(&0)
     }
 
-    #[inline]
-    fn len(&self) -> u32 {
-        self.end - self.start
+    fn upper(&self) -> Bound<&u32> {
+        Bound::Unbounded
+    }
+}
+impl BitIndex for Range<u32> {
+    fn upper(&self) -> Bound<&u32> {
+        self.end_bound()
+    }
+
+    fn low(&self) -> Bound<&u32> {
+        self.start_bound()
     }
 }
 impl BitIndex for u32 {
-    #[inline]
-    fn offset(&self) -> u32 {
-        *self
+    fn upper(&self) -> Bound<&u32> {
+        Bound::Included(self)
     }
-    #[inline]
-    fn len(&self) -> u32 {
-        1
+
+    fn low(&self) -> Bound<&u32> {
+        Bound::Included(self)
     }
 }
-
 /// 将整型转为 Bits，实际操作由 BitsOps 来实现。
-pub trait IntoBits<T: BitIndex>
+pub trait IntoBits
 where
     Self: Sized + Copy,
 {
     type Output: BitsOps<Self>;
-    fn bits(self, range: T) -> Self::Output;
+    fn bits<T: BitIndex>(self, range: T) -> Self::Output;
 }
 macro_rules! mask {
     ($Type:ty, $Range:expr) => {
-        (<$Type>::MAX >> (<$Type>::BITS - $Range.len())) << $Range.offset()
+        (<$Type>::MAX >> (<$Type>::BITS - ($Range.end() - $Range.start() + 1))) << $Range.start()
     };
 }
 macro_rules! impl_intobits {
     ($($Type:ty) *) => {
-        $(impl<T:BitIndex> IntoBits<T> for $Type {
-            type Output = Bits<T, Self>;
-            fn bits(self, range:T) -> Self::Output{
+        $(impl IntoBits for $Type {
+            type Output = Bits<Self>;
+
+            fn bits<T: BitIndex>(self, range:T) -> Bits<Self>{
+                let upper = match  <T as BitIndex>::upper(&range) {
+                    Bound::Unbounded => <$Type>::BITS - 1,
+                    Bound::Included(v) => *v,
+                    Bound::Excluded(v) => *v - 1,
+                };
+                let low = match  <T as BitIndex>::low(&range) {
+                    Bound::Unbounded => 0,
+                    Bound::Included(v) => *v,
+                    Bound::Excluded(v) => *v,
+                };
                 Bits {
                     value:self,
-                    range
+                    range: low ..= upper
                 }
             }
         })*
@@ -100,29 +114,29 @@ impl_intobits!(u8 u16 u32 u64 u128);
 /// 当然也可以通过 `0u8.bits_set(5); ` 来避免，但 bits_write 的存在依旧会暴露风险。
 ///
 /// 综上选择单独构造 Bits 结构体。
-pub struct Bits<R: BitIndex, V: IntoBits<R>> {
-    range: R,
+pub struct Bits<V: IntoBits> {
+    range: RangeInclusive<u32>,
     value: V,
 }
 
-impl<R: BitIndex, V: IntoBits<R> + IntoBits<u32>> IntoIterator for Bits<R, V> {
+impl<V: IntoBits> IntoIterator for Bits<V> {
     type Item = Bit<V>;
 
     type IntoIter = BitsIter<V>;
 
     fn into_iter(self) -> Self::IntoIter {
         Self::IntoIter {
-            low: self.range.offset(),
-            upper: self.range.offset() + self.range.len() - 1,
+            low: *self.range.start(),
+            upper: *self.range.end(),
             value: self.value,
         }
     }
 }
 
-pub struct Bit<V: IntoBits<u32>> {
+pub struct Bit<V: IntoBits> {
     value: V,
 }
-impl<V: IntoBits<u32>> Bit<V> {
+impl<V: IntoBits> Bit<V> {
     #[inline]
     pub fn is_set(&self) -> bool {
         self.value.bits(0).is_set()
@@ -137,13 +151,13 @@ impl<V: IntoBits<u32>> Bit<V> {
 ///
 /// ~~⚠️ 性能较差，比手动掩码移位循环慢三分之一左右。~~
 /// 目前使用迭代器的速度要比手动编码快 99%，很戏剧化。
-pub struct BitsIter<V: IntoBits<u32>> {
+pub struct BitsIter<V: IntoBits> {
     value: V,
-    upper: u32,
     low: u32,
+    upper: u32,
 }
 
-impl<V: IntoBits<u32>> Iterator for BitsIter<V> {
+impl<V: IntoBits> Iterator for BitsIter<V> {
     type Item = Bit<V>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -172,7 +186,7 @@ pub trait BitsOps<T> {
 
 macro_rules! impl_bitsops {
     ($($Type:ty) *) => {
-        $(impl<R:BitIndex> BitsOps<$Type> for  Bits<R, $Type> {
+        $(impl BitsOps<$Type> for Bits<$Type> {
             #[must_use="set function dosen't modify the self in place, you should assign to it explicitly"]
             fn set(&self) -> $Type {
                 let mask = mask!($Type, self.range);
@@ -191,11 +205,11 @@ macro_rules! impl_bitsops {
             #[must_use="write function dosen't modify the self in place, you should assign to it explicitly"]
             fn write(&self, value: $Type) -> $Type {
                 let mask = mask!($Type, self.range);
-                (self.value & (!mask)) | ((value << self.range.offset()) & mask)
+                (self.value & (!mask)) | ((value << self.range.start()) & mask)
             }
             fn read(&self) -> $Type {
                 let mask = mask!($Type, self.range);
-                (self.value & mask) >> self.range.offset()
+                (self.value & mask) >> self.range.start()
             }
             fn is_clr(&self) -> bool {
                 self.read() == 0
@@ -261,11 +275,13 @@ mod tests {
 
     use crate::{BitsOps, IntoBits};
 
+    #[no_mangle]
     fn bits_iterator(data: u64, out: &mut [u8; 64]) {
         for (idx, bit) in data.bits(0..=63).into_iter().enumerate() {
             out[idx] = bit.is_set() as u8;
         }
     }
+    #[no_mangle]
     fn plain_loop(data: u64, out: &mut [u8; 64]) {
         let mut mask = 0x1u64;
         let mut idx = 0usize;
@@ -344,3 +360,10 @@ mod tests {
         })
     }
 }
+
+// 👌 请注意对比和修改测试跑分结果
+//
+// test tests::bench_bits_iterator_code  ... bench:      15,323 ns/iter (+/- 172)
+// test tests::bench_count_ones_bits     ... bench:      26,211 ns/iter (+/- 326)
+// test tests::bench_count_ones_internal ... bench:      28,036 ns/iter (+/- 494)
+// test tests::bench_plain_loop_code     ... bench:   1,514,810 ns/iter (+/- 13,509)

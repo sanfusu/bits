@@ -170,6 +170,7 @@ pub trait BitsOps<T> {
     fn read(&self) -> T;
     fn is_clr(&self) -> bool;
     fn is_set(&self) -> bool;
+    fn count_ones(&self) -> u32;
 }
 
 macro_rules! impl_bitsops {
@@ -206,23 +207,69 @@ macro_rules! impl_bitsops {
                 let mask = mask!($Type, self.range);
                 (self.value & mask) == mask
             }
+            /// 运行效率和标准库（编译器内部提供的）不相上下。
+            fn count_ones(&self) -> u32 {
+                use core::convert::TryInto;
+                let mut ret = self.read();
+                let mut i = 1;
+                while i <= core::mem::size_of::<$Type>() * 4 {
+                    let max = !(0 as $Type);
+                    let div = (1 << i) + 1;
+                    let a:$Type = max / div;
+                    let b:$Type = a << i;
+                    ret = (a & ret) + ((b & ret) >> i);
+                    i = i << 1;
+                }
+                ret.try_into().unwrap()
+            }
         })*
     };
 }
 impl_bitsops!(u8 u16 u32 u64 u128);
 
+/// 这是一个示例，旨在演示思路
+/// 1. 先每两个 bit 为一组计数，并且每一组之间可以并行计算。（利用了加法器的 bit 间的并行性）
+/// 2. 合并，得出每 4 个 bit 为一组的计数
+/// 3. 再次合并，得出每 8 个 bit 为一组的计数。
+/// 4. 如果是单字节，则到此结束，否则以此类推下去。
+#[inline]
+fn __count_ones_u8(data: u8) -> u32 {
+    let x1 = data & 0b0101_0101;
+    let x2 = (data & 0b1010_1010) >> 1;
+
+    let y = x1 + x2;
+    let y1 = (y & 0b1100_1100) >> 2;
+    let y2 = y & 0b0011_0011;
+
+    let z = y1 + y2;
+    let z1 = z & 0b0000_1111;
+    let z2 = (z & 0b1111_0000) >> 4;
+
+    return (z2 + z1) as u32;
+}
+
+/// 这是一个示例，旨在演示思路，实际上在计算 x1 和 x2 时没有并行。
+/// 所以利用 u8 来计算 u16 不是一个好的做法，
+/// 沿着 __count_ones_u8 的思路才是正道。
+#[no_mangle]
+fn __count_ones_u16(data: u16) -> u32 {
+    let x1 = __count_ones_u8(data.to_ne_bytes()[1]);
+    let x2 = __count_ones_u8(data.to_ne_bytes()[0]);
+    x1 + x2
+}
+
 #[cfg(test)]
 mod tests {
     use test::Bencher;
 
-    use crate::IntoBits;
+    use crate::{BitsOps, IntoBits};
 
-    fn iterator_code(data: u64, out: &mut [u8; 64]) {
+    fn bits_iterator(data: u64, out: &mut [u8; 64]) {
         for (idx, bit) in data.bits(0..=63).into_iter().enumerate() {
             out[idx] = bit.is_set() as u8;
         }
     }
-    fn loop_code(data: u64, out: &mut [u8; 64]) {
+    fn plain_loop(data: u64, out: &mut [u8; 64]) {
         let mut mask = 0x1u64;
         let mut idx = 0usize;
         while idx < 64 {
@@ -237,50 +284,55 @@ mod tests {
     }
 
     #[test]
-    fn iterator_test() {
+    fn bits_iterator_test() {
         let mut out_iterator = [0u8; 64];
         let mut out_loop = [0u8; 64];
         (0..=0xffff).for_each(|x| {
-            iterator_code(x, &mut out_iterator);
-            loop_code(x, &mut out_loop);
+            bits_iterator(x, &mut out_iterator);
+            plain_loop(x, &mut out_loop);
             assert_eq!(out_iterator, out_loop);
         })
     }
-
-    #[bench]
-    fn bench_loop_code(b: &mut Bencher) {
-        let n = test::black_box(0xffff);
-        let mut out = test::black_box([0u8; 64]);
-        b.iter(|| (0..=n).for_each(|x| loop_code(x, &mut out)))
+    #[test]
+    // TODO 需要随机测试
+    fn count_ones_test() {
+        (0..=0x7f).for_each(|x: u8| assert_eq!(x.bits(0..=7).count_ones(), x.count_ones()));
+        (0x5a5a..=0xffff)
+            .for_each(|x: u16| assert_eq!(x.bits(0..=15).count_ones(), x.count_ones()));
+        (0x5a5a5a5a..=0x5a5aff5a)
+            .for_each(|x: u32| assert_eq!(x.bits(0..=32).count_ones(), x.count_ones()));
+        (0x5a5a_5a5a_5a5a_5a5a..=0x5a5a_55aa_ffff_5a5a)
+            .for_each(|x: u64| assert_eq!(x.bits(0..=63).count_ones(), x.count_ones()));
     }
 
     #[bench]
-    fn bench_iterator_code(b: &mut Bencher) {
+    fn bench_plain_loop_code(b: &mut Bencher) {
         let n = test::black_box(0xffff);
         let mut out = test::black_box([0u8; 64]);
-        b.iter(|| (0..=n).for_each(|x| iterator_code(x, &mut out)))
+        b.iter(|| (0..=n).for_each(|x| plain_loop(x, &mut out)))
+    }
+
+    #[bench]
+    fn bench_bits_iterator_code(b: &mut Bencher) {
+        let n = test::black_box(0xffff);
+        let mut out = test::black_box([0u8; 64]);
+        b.iter(|| (0..=n).for_each(|x| bits_iterator(x, &mut out)))
     }
     #[no_mangle]
-    fn count_ones_iterator(data: u64) -> u32 {
-        let mut ret = 0;
-        for bit in data.bits(0..=63) {
-            if bit.is_set() {
-                ret += 1;
-            }
-        }
-        ret
+    fn count_ones_bits(data: u64) -> u32 {
+        data.bits(0..=64).count_ones()
     }
     #[no_mangle]
     fn count_ones_interal(data: u64) -> u32 {
         data.count_ones()
     }
     #[bench]
-    fn bench_count_ones_iterator(b: &mut Bencher) {
+    fn bench_count_ones_bits(b: &mut Bencher) {
         let n = test::black_box(0xffff);
         let mut result = test::black_box(0);
         b.iter(|| {
-            (0..=n).for_each(|x| {
-                result += count_ones_iterator(x);
+            (0..=n).for_each(|x: u16| {
+                result += x.bits(0..=16).count_ones();
             })
         });
     }
@@ -289,8 +341,8 @@ mod tests {
         let n = test::black_box(0xffff);
         let mut result = test::black_box(0);
         b.iter(|| {
-            (0..=n).for_each(|x: u64| {
-                result += count_ones_interal(x);
+            (0..=n).for_each(|x: u16| {
+                result += x.count_ones();
             })
         })
     }

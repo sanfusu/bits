@@ -77,7 +77,9 @@ where
 }
 macro_rules! mask {
     ($Type:ty, $Range:expr) => {
-        (<$Type>::MAX >> (<$Type>::BITS - ($Range.end() - $Range.start() + 1))) << $Range.start()
+        (<$Type>::MAX << (<$Type>::BITS - $Range.end() - 1)
+            >> (<$Type>::BITS - $Range.end() - 1 + $Range.start()))
+            << $Range.start()
     };
 }
 macro_rules! impl_intobits {
@@ -96,9 +98,10 @@ macro_rules! impl_intobits {
                     Bound::Included(v) => *v,
                     Bound::Excluded(v) => *v,
                 };
+
                 Bits {
                     value:self,
-                    range: low ..= upper
+                    range: low ..= core::cmp::min(upper, <$Type>::BITS - 1)
                 }
             }
         })*
@@ -132,6 +135,12 @@ impl_intobits!(u8 u16 u32 u64 u128);
 /// 当然也可以通过 `0u8.bits_set(5); ` 来避免，但 bits_write 的存在依旧会暴露风险。
 ///
 /// 综上选择单独构造 Bits 结构体。
+///
+/// ## 关于溢出
+///
+/// 只尽可能的使输出的值符合预期：
+/// `0u8.bits(0..=10).set() == 0xff` `0xffu8.bits(3..2).clr() == 0xff`
+/// 当然这两个代码片段在非 release 编译下会导致溢出 panic（rust 自带的溢出检查）。
 pub struct Bits<V: IntoBits> {
     range: RangeInclusive<u32>,
     value: V,

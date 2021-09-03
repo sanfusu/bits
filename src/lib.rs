@@ -56,10 +56,7 @@ where
 }
 macro_rules! mask {
     ($Type:ty, $Range:expr) => {
-        match (1 as $Type).checked_shl($Range.len()) {
-            Some(value) => value - 1,
-            None => <$Type>::MAX,
-        } << $Range.offset()
+        (<$Type>::MAX >> (<$Type>::BITS - $Range.len())) << $Range.offset()
     };
 }
 macro_rules! impl_intobits {
@@ -300,7 +297,7 @@ mod tests {
         (0x5a5a..=0xffff)
             .for_each(|x: u16| assert_eq!(x.bits(0..=15).count_ones(), x.count_ones()));
         (0x5a5a5a5a..=0x5a5aff5a)
-            .for_each(|x: u32| assert_eq!(x.bits(0..=32).count_ones(), x.count_ones()));
+            .for_each(|x: u32| assert_eq!(x.bits(0..=31).count_ones(), x.count_ones()));
         (0x5a5a_5a5a_5a5a_5a5a..=0x5a5a_55aa_ffff_5a5a)
             .for_each(|x: u64| assert_eq!(x.bits(0..=63).count_ones(), x.count_ones()));
     }
@@ -320,7 +317,7 @@ mod tests {
     }
     #[no_mangle]
     fn count_ones_bits(data: u64) -> u32 {
-        data.bits(0..=64).count_ones()
+        data.bits(0..=63).count_ones()
     }
     #[no_mangle]
     fn count_ones_interal(data: u64) -> u32 {
@@ -332,7 +329,7 @@ mod tests {
         let mut result = test::black_box(0);
         b.iter(|| {
             (0..=n).for_each(|x: u16| {
-                result += x.bits(0..=16).count_ones();
+                result += x.bits(0..=15).count_ones();
             })
         });
     }

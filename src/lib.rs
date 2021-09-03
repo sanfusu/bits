@@ -337,7 +337,7 @@ mod tests {
         });
     }
     #[bench]
-    fn bench_count_ones_interal(b: &mut Bencher) {
+    fn bench_count_ones_internal(b: &mut Bencher) {
         let n = test::black_box(0xffff);
         let mut result = test::black_box(0);
         b.iter(|| {

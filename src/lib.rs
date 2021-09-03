@@ -5,7 +5,7 @@ extern crate test;
 
 pub mod field;
 
-use core::ops::{Bound, Range, RangeBounds, RangeFull, RangeInclusive};
+use core::ops::{Bound, Range, RangeBounds, RangeFrom, RangeFull, RangeInclusive, RangeTo};
 
 /// 提供类似于 SliceIndex 的使用方式。
 pub trait BitIndex {
@@ -29,6 +29,24 @@ impl BitIndex for RangeFull {
 
     fn upper(&self) -> Bound<&u32> {
         Bound::Unbounded
+    }
+}
+impl BitIndex for RangeFrom<u32> {
+    fn low(&self) -> Bound<&u32> {
+        self.start_bound()
+    }
+
+    fn upper(&self) -> Bound<&u32> {
+        Bound::Unbounded
+    }
+}
+impl BitIndex for RangeTo<u32> {
+    fn low(&self) -> Bound<&u32> {
+        Bound::Included(&0)
+    }
+
+    fn upper(&self) -> Bound<&u32> {
+        self.end_bound()
     }
 }
 impl BitIndex for Range<u32> {
@@ -274,6 +292,15 @@ mod tests {
     use test::Bencher;
 
     use crate::{BitsOps, IntoBits};
+
+    #[test]
+    fn bits_ops_test() {
+        assert_eq!(0xffu8.bits(..).clr(), 0);
+        assert_eq!(0xffu8.bits(..1).clr(), 0xff - 0b1);
+        assert_eq!(0xffu8.bits(1..).clr(), 1);
+        assert_eq!(0xffu8.bits(1..2).clr(), 0xff - 0b10);
+        assert_eq!(0xffu8.bits(1..=2).clr(), 0xff - 0b110);
+    }
 
     #[no_mangle]
     fn bits_iterator(data: u64, out: &mut [u8; 64]) {

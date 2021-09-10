@@ -14,55 +14,66 @@ pub trait BitIndex {
 }
 
 impl BitIndex for RangeInclusive<u32> {
+    #[inline]
     fn upper(&self) -> Bound<&u32> {
         self.end_bound()
     }
-
+    #[inline]
     fn low(&self) -> Bound<&u32> {
         self.start_bound()
     }
 }
 impl BitIndex for RangeFull {
+    #[inline]
     fn low(&self) -> Bound<&u32> {
         Bound::Included(&0)
     }
 
+    #[inline]
     fn upper(&self) -> Bound<&u32> {
         Bound::Unbounded
     }
 }
 impl BitIndex for RangeFrom<u32> {
+    #[inline]
     fn low(&self) -> Bound<&u32> {
         self.start_bound()
     }
 
+    #[inline]
     fn upper(&self) -> Bound<&u32> {
         Bound::Unbounded
     }
 }
 impl BitIndex for RangeTo<u32> {
+    #[inline]
     fn low(&self) -> Bound<&u32> {
         Bound::Included(&0)
     }
 
+    #[inline]
     fn upper(&self) -> Bound<&u32> {
         self.end_bound()
     }
 }
 impl BitIndex for Range<u32> {
+    #[inline]
     fn upper(&self) -> Bound<&u32> {
         self.end_bound()
     }
 
+    #[inline]
     fn low(&self) -> Bound<&u32> {
         self.start_bound()
     }
 }
 impl BitIndex for u32 {
+    #[inline]
     fn upper(&self) -> Bound<&u32> {
         Bound::Included(self)
     }
 
+    #[inline]
     fn low(&self) -> Bound<&u32> {
         Bound::Included(self)
     }
@@ -108,7 +119,7 @@ macro_rules! impl_intobits {
     };
 }
 
-impl_intobits!(u8 u16 u32 u64 u128);
+impl_intobits!(u8 u16 u32 u64 u128 usize);
 
 /// 该结构体可以通过 `0x10u32.bits(0x01)` 来构造
 /// ```
@@ -215,37 +226,45 @@ macro_rules! impl_bitsops {
     ($($Type:ty) *) => {
         $(impl BitsOps<$Type> for Bits<$Type> {
             #[must_use="set function dosen't modify the self in place, you should assign to it explicitly"]
+            #[inline]
             fn set(&self) -> $Type {
                 let mask = mask!($Type, self.range);
                 self.value | mask
             }
             #[must_use="clr function dosen't modify the self in place, you should assign to it explicitly"]
+            #[inline]
             fn clr(&self) -> $Type {
                 let mask = mask!($Type, self.range);
                 self.value & (!mask)
             }
             #[must_use="revert function dosen't modify the self in place, you should assign to it explicitly"]
+            #[inline]
             fn revert(&self) -> $Type {
                 let mask = mask!($Type, self.range);
                 self.value ^ mask
             }
             #[must_use="write function dosen't modify the self in place, you should assign to it explicitly"]
+            #[inline]
             fn write(&self, value: $Type) -> $Type {
                 let mask = mask!($Type, self.range);
                 (self.value & (!mask)) | ((value << self.range.start()) & mask)
             }
+            #[inline]
             fn read(&self) -> $Type {
                 let mask = mask!($Type, self.range);
                 (self.value & mask) >> self.range.start()
             }
+            #[inline]
             fn is_clr(&self) -> bool {
                 self.read() == 0
             }
+            #[inline]
             fn is_set(&self) -> bool {
                 let mask = mask!($Type, self.range);
                 (self.value & mask) == mask
             }
             /// 运行效率和标准库（编译器内部提供的）不相上下。
+            #[inline]
             fn count_ones(&self) -> u32 {
                 use core::convert::TryInto;
                 let mut ret = self.read();
@@ -263,7 +282,7 @@ macro_rules! impl_bitsops {
         })*
     };
 }
-impl_bitsops!(u8 u16 u32 u64 u128);
+impl_bitsops!(u8 u16 u32 u64 u128 usize);
 
 /// 这是一个示例，旨在演示思路
 /// 1. 先每两个 bit 为一组计数，并且每一组之间可以并行计算。（利用了加法器的 bit 间的并行性）
@@ -345,13 +364,12 @@ mod tests {
     #[test]
     // TODO 需要随机测试
     fn count_ones_test() {
-        (0..=0x7f).for_each(|x: u8| assert_eq!(x.bits(0..=7).count_ones(), x.count_ones()));
-        (0x5a5a..=0xffff)
-            .for_each(|x: u16| assert_eq!(x.bits(0..=15).count_ones(), x.count_ones()));
+        (0..=0x7f).for_each(|x: u8| assert_eq!(x.bits(..).count_ones(), x.count_ones()));
+        (0x5a5a..=0xffff).for_each(|x: u16| assert_eq!(x.bits(..).count_ones(), x.count_ones()));
         (0x5a5a5a5a..=0x5a5aff5a)
-            .for_each(|x: u32| assert_eq!(x.bits(0..=31).count_ones(), x.count_ones()));
+            .for_each(|x: u32| assert_eq!(x.bits(..).count_ones(), x.count_ones()));
         (0x5a5a_5a5a_5a5a_5a5a..=0x5a5a_55aa_ffff_5a5a)
-            .for_each(|x: u64| assert_eq!(x.bits(0..=63).count_ones(), x.count_ones()));
+            .for_each(|x: u64| assert_eq!(x.bits(..).count_ones(), x.count_ones()));
     }
 
     #[bench]
@@ -369,7 +387,7 @@ mod tests {
     }
     #[no_mangle]
     fn count_ones_bits(data: u64) -> u32 {
-        data.bits(0..=63).count_ones()
+        data.bits(..).count_ones()
     }
     #[no_mangle]
     fn count_ones_interal(data: u64) -> u32 {

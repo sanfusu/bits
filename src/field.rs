@@ -184,51 +184,6 @@ macro_rules! fields_ex {
             )+
         )+
     };
-    (__ops: ro, $buffer_type:ty, $value_type:tt, $field:ident, $raw_data:ident, $position_start:literal $(..= $position_end:literal)?
-        $(output_converter:$output_converter:expr)?
-    ) => {
-        impl $crate::field::FieldReader<$buffer_type> for $field {
-            #[inline]
-            fn read(buffer: &$buffer_type) -> Self::ValueType {
-                use $crate::IntoBits;
-                use $crate::BitsOps;
-                let x = buffer.$raw_data.bits($position_start $(..= $position_end)?).read();
-                let y = $crate::fields!{
-                    __output_converter: x, $value_type, $position_start $(..= $position_end)? $(,$output_converter)?
-                };
-                y
-            }
-        }
-    };
-    (__ops: rw, $buffer_type:ty, $value_type:tt, $field:ident, $raw_data:ident, $position_start:literal $(..= $position_end:literal)?
-        $(input_converter:$input_converter:expr;)?
-        $(output_converter:$output_converter:expr;)?
-    ) => {
-        $crate::fields!{
-            __ops: ro, $buffer_type, $value_type, $field, $raw_data, $position_start $(..= $position_end)? $(output_converter:$output_converter)?
-        }
-        impl $crate::field::FieldWriter<$buffer_type> for $field {
-            #[inline]
-            fn write(buffer: &mut $buffer_type, value: Self::ValueType){
-                use $crate::IntoBits;
-                use $crate::BitsOps;
-                buffer.$raw_data = buffer.$raw_data.bits($position_start $(..= $position_end)?).write(
-                    $crate::fields!{
-                        __input_converter: value, $value_type, $position_start $(..= $position_end)? $(,$input_converter)?
-                    }
-                );
-            }
-        }
-    };
-    (__output_converter: $var:ident, bool, $position_start:literal) => {
-        ($var == 1)
-    };
-    ($__converter:tt: $var:ident, $value_type:tt, $position_start:literal $(..= $position_end:literal)?) => {
-        $var.into()
-    };
-    ($__converter:tt: $var:ident, $value_type:tt, $position_start:literal $(..= $position_end:literal)?, $converter:expr) => {
-        $converter($var)
-    };
 }
 
 /// # Buffer 写入器

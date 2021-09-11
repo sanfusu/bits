@@ -134,6 +134,12 @@ macro_rules! fields {
                     }
                 );
             }
+            #[inline]
+            fn revert(buffer: &mut $buffer_type) {
+                use $crate::IntoBits;
+                use $crate::BitsOps;
+                buffer.$raw_data = buffer.$raw_data.bits($position_start $(..= $position_end)?).revert();
+            }
         }
     };
     (__output_converter: $var:ident, bool, $position_start:literal) => {
@@ -200,6 +206,13 @@ pub trait BufferWriter {
         T::write(self, value);
         self
     }
+    fn revert<T>(&mut self) -> &mut Self
+    where
+        T: Field<Self> + FieldWriter<Self>,
+    {
+        T::revert(self);
+        self
+    }
 }
 /// # Buffer 读出器
 ///
@@ -236,6 +249,7 @@ where
     BufferType: ?Sized,
 {
     fn write(buffer: &mut BufferType, value: Self::ValueType);
+    fn revert(buffer: &mut BufferType);
 }
 /// # bit 字段读出器
 ///

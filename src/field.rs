@@ -166,7 +166,7 @@ macro_rules! fields_ex {
             $buffer_type:ty [$raw_data:ident] {
                 $(
                     $(#[$doc:meta])*
-                    $field:ident [$position_start:literal $(..= $position_end:literal)? , $rw:tt, $value_type:tt $(<$generic:tt>)?] $({
+                    $Vis:vis $field:ident [$position_start:literal $(..= $position_end:literal)? , $rw:tt, $value_type:tt $(<$generic:tt>)?] $({
                         $(input_converter:$input_converter:expr;)?
                         $(output_converter:$output_converter:expr)?
                     })?
@@ -177,7 +177,10 @@ macro_rules! fields_ex {
         $(
             $(
                 $(#[$doc])*
-                pub struct $field;
+                $Vis struct $field;
+                impl $field {
+                    pub const OFFSET:u32 = $position_start;
+                }
                 impl $crate::field::Field<$buffer_type> for $field {
                     type ValueType = $value_type $(<$generic>)?;
                 }

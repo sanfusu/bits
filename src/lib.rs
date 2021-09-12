@@ -88,11 +88,11 @@ where
 }
 macro_rules! mask {
     ($Type:ty, $Range:expr) => {
-        (<$Type>::MAX << (<$Type>::BITS - $Range.end() - 1)
-            >> (<$Type>::BITS - $Range.end() - 1 + $Range.start()))
-            << $Range.start()
+        (((1 as $Type) << $Range.end()) - ((1 as $Type) << $Range.start()))
+            | ((1 as $Type) << $Range.end())
     };
 }
+
 macro_rules! impl_intobits {
     ($($Type:ty) *) => {
         $(impl IntoBits for $Type {
@@ -112,7 +112,7 @@ macro_rules! impl_intobits {
 
                 Bits {
                     value:self,
-                    range: low ..= core::cmp::min(upper, <$Type>::BITS - 1)
+                    range: low ..= upper
                 }
             }
         })*
@@ -330,6 +330,16 @@ mod tests {
         assert_eq!(0xffu8.bits(1..=2).clr(), 0xff - 0b110);
     }
 
+    #[test]
+    #[should_panic(expected = "overflow")]
+    fn bits_ops_test_end_overflow() {
+        0xffu8.bits(0..=8).clr();
+    }
+    #[test]
+    #[should_panic(expected = "overflow")]
+    fn bits_ops_test_start_overflow() {
+        0xffu8.bits(2..=1).clr();
+    }
     #[no_mangle]
     fn bits_iterator(data: u64, out: &mut [u8; 64]) {
         for (idx, bit) in data.bits(0..=63).into_iter().enumerate() {

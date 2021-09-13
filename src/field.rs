@@ -82,7 +82,7 @@ macro_rules! fields {
                         $(input_converter:$input_converter:expr;)?
                         $(output_converter:$output_converter:expr)?
                     })?
-                ),+
+                ),+  $(,)?
             }
         )+
     ) => {
@@ -170,7 +170,7 @@ macro_rules! fields_ex {
                         $(input_converter:$input_converter:expr;)?
                         $(output_converter:$output_converter:expr)?
                     })?
-                ),+
+                ),+ $(,)?
             }
         )+
     ) => {

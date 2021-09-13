@@ -212,10 +212,18 @@ impl<V: IntoBits> Iterator for BitsIter<V> {
 }
 /// bits 的实际操作
 pub trait BitsOps<T> {
+    #[must_use = "set function dosen't modify the self in place, you should assign to it explicitly"]
     fn set(&self) -> T;
+
+    #[must_use = "clr function dosen't modify the self in place, you should assign to it explicitly"]
     fn clr(&self) -> T;
+
+    #[must_use = "revert function dosen't modify the self in place, you should assign to it explicitly"]
     fn revert(&self) -> T;
+
+    #[must_use = "write function dosen't modify the self in place, you should assign to it explicitly"]
     fn write(&self, value: T) -> T;
+
     fn read(&self) -> T;
     fn is_clr(&self) -> bool;
     fn is_set(&self) -> bool;
@@ -225,25 +233,21 @@ pub trait BitsOps<T> {
 macro_rules! impl_bitsops {
     ($($Type:ty) *) => {
         $(impl BitsOps<$Type> for Bits<$Type> {
-            #[must_use="set function dosen't modify the self in place, you should assign to it explicitly"]
             #[inline]
             fn set(&self) -> $Type {
                 let mask = mask!($Type, self.range);
                 self.value | mask
             }
-            #[must_use="clr function dosen't modify the self in place, you should assign to it explicitly"]
             #[inline]
             fn clr(&self) -> $Type {
                 let mask = mask!($Type, self.range);
                 self.value & (!mask)
             }
-            #[must_use="revert function dosen't modify the self in place, you should assign to it explicitly"]
             #[inline]
             fn revert(&self) -> $Type {
                 let mask = mask!($Type, self.range);
                 self.value ^ mask
             }
-            #[must_use="write function dosen't modify the self in place, you should assign to it explicitly"]
             #[inline]
             fn write(&self, value: $Type) -> $Type {
                 let mask = mask!($Type, self.range);
@@ -333,12 +337,16 @@ mod tests {
     #[test]
     #[should_panic(expected = "overflow")]
     fn bits_ops_test_end_overflow() {
-        0xffu8.bits(0..=8).clr();
+        {
+            0xffu8.bits(0..=8).clr()
+        };
     }
     #[test]
     #[should_panic(expected = "overflow")]
     fn bits_ops_test_start_overflow() {
-        0xffu8.bits(2..=1).clr();
+        {
+            0xffu8.bits(2..=1).clr()
+        };
     }
     #[no_mangle]
     fn bits_iterator(data: u64, out: &mut [u8; 64]) {

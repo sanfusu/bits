@@ -178,9 +178,6 @@ macro_rules! fields_ex {
             $(
                 $(#[$doc])*
                 $Vis struct $field;
-                impl $field {
-                    pub const OFFSET:u32 = $position_start;
-                }
                 impl $crate::field::Field<$buffer_type> for $field {
                     type ValueType = $value_type $(<$generic>)?;
                 }

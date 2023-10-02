@@ -4,6 +4,7 @@ pub trait Bitalized {
     type BaseType;
 }
 
+/// ReadableField 和 WriteableField 以及 TryReadableField 可以省略，因为已经有了 Ops trait 了。
 pub trait ReadableField<C: Bitalized + ?Sized> {
     type TargetType: From<C::BaseType>;
 }

@@ -1,39 +1,33 @@
-use std::convert::{From, Into, TryFrom};
-
 pub trait Bitalized {
     type BaseType;
 }
-
-/// ReadableField 和 WriteableField 以及 TryReadableField 可以省略，因为已经有了 Ops trait 了。
-pub trait ReadableField<C: Bitalized + ?Sized> {
-    type TargetType: From<C::BaseType>;
-}
-pub trait WriteableField<C: Bitalized + ?Sized> {
-    type TargetType: Into<C::BaseType>;
+pub trait Field {
+    type CacheType;
 }
 
-pub trait TryReadableField<C: Bitalized + ?Sized> {
-    type TargetType: TryFrom<C::BaseType>;
-}
-
-pub trait ReadField<F: ReadableField<Self>>
+pub trait ReadField<F: Field>
 where
     Self: Bitalized,
 {
-    fn read(&self, field: F) -> F::TargetType;
+    fn read(&self, field: F) -> F::CacheType;
 }
-pub trait TryReadField<F: TryReadableField<Self>>
+
+/// TryReadField 并不要求 CacheType 实现 TryFrom<Self::BaseType>
+/// 这样可以减少部分暴露。
+/// 但是如果在 Macro 中使用了 Try, 则要求 TryFrom trait 的实现。
+pub trait TryReadField<F>
 where
     Self: Bitalized,
+    F: Field,
 {
-    fn try_read(
-        &self,
-        field: F,
-    ) -> Result<F::TargetType, <F::TargetType as TryFrom<Self::BaseType>>::Error>;
+    type Error;
+    fn try_read(&self, field: F) -> Result<F::CacheType, Self::Error>;
 }
-pub trait WriteField<F: WriteableField<Self>>
+
+pub trait WriteField<F>
 where
     Self: Bitalized,
+    F: Field,
 {
-    fn write(&mut self, field: F, v: F::TargetType);
+    fn write(&mut self, field: F, v: F::CacheType);
 }
